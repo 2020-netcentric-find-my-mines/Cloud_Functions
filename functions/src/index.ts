@@ -13,6 +13,7 @@ export const helloWorld = functions.https.onRequest((request, response) => {
   response.send("Hello from Firebase!");
 });
 
+//Automatically add user documents in firestore once an account is created
 export const addUserDoc = functions
   .region("asia-southeast2")
   .auth.user()
@@ -114,7 +115,7 @@ export const getUserData = functions
       });
   });
 
-//Require numOfPlayers as query
+//Required numOfPlayers as query
 export const getTopScorers = functions
   .region("asia-southeast2")
   .https.onRequest((req, res) => {
@@ -145,6 +146,7 @@ export const getTopScorers = functions
       });
   });
 
+//Required gameId as query and data with uid / username / message
 export const addChatMessage = functions
   .region("asia-southeast2")
   .https.onRequest((req, res) => {
@@ -176,6 +178,29 @@ export const addChatMessage = functions
       .catch((err) => {
         console.log(err);
         sendErrorMsg(500, "Error while adding message to database.", res);
+      });
+  });
+
+//Required gameId as query
+export const deleteGameChat = functions
+  .region("asia-southeast2")
+  .https.onRequest((req, res) => {
+    const gameId: any = req.query.gameId;
+    if (!gameId) sendErrorMsg(400, "No gameId passed.", res);
+    return admin
+      .database()
+      .ref("games/" + gameId)
+      .remove()
+      .then(() => {
+        res.status(200).json({
+          isOk: true,
+          message: "Game chat messages deleted",
+          gameId: gameId,
+        });
+      })
+      .catch((err) => {
+        console.log(err);
+        sendErrorMsg(404, "No game room found with given gameId.", res);
       });
   });
 
