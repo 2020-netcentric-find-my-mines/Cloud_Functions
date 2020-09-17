@@ -8,11 +8,6 @@ const gamesRef = admin.database().ref("games");
 
 // // Start writing Firebase Functions
 
-export const helloWorld = functions.https.onRequest((request, response) => {
-  functions.logger.info("Hello logs!", { structuredData: true });
-  response.send("Hello from Firebase!");
-});
-
 //Automatically add user documents in firestore once an account is created
 export const addUserDoc = functions
   .region("asia-southeast2")
@@ -30,6 +25,7 @@ export const addUserDoc = functions
       gamesWonWeek: 0,
       createdAt: admin.firestore.Timestamp.now(),
     };
+
     return usersCol
       .doc(uid)
       .set(data)
@@ -41,7 +37,9 @@ export const addUserDoc = functions
 //Required user to authenticate and data as object: username / firstname / lastname
 export const changeUserData = functions
   .region("asia-southeast2")
-  .https.onCall((data, context) => {
+  .https.onCall(async (data, context) => {
+    
+    //Check if auth exists
     const auth = context.auth;
     if (!auth) {
       throw new functions.https.HttpsError(
@@ -49,14 +47,16 @@ export const changeUserData = functions
         "Function must be called when authenticated."
       );
     }
+
     const uid = auth.uid;
-    let updateData: Record<string, any> = {
+    const updateData: Record<string, any> = {
       updatedAt: admin.firestore.Timestamp.now(),
     };
     if (data.username) updateData.username = data.username;
     if (data.firstname) updateData.firstname = data.firstname;
     if (data.lastname) updateData.lastname = data.lastname;
-    return usersCol
+
+    await usersCol
       .doc(uid)
       .update(updateData)
       .catch((err) => {
@@ -66,15 +66,20 @@ export const changeUserData = functions
           "An error occurred while trying to update user data."
         );
       });
+    return { isOk: true, updatedData: updateData };
   });
 
 //Increment user's games won by specifying uid as query
 export const incrementUserScore = functions
   .region("asia-southeast2")
   .https.onRequest((req, res) => {
+    
+    //Check if uid passed
     const uid: any = req.query.uid;
-    if (!uid) sendErrorMsg(400, "No uid passed", res);
+    if (!uid) sendStatusMsg(400, false, "No uid passed", res);
+
     const increment = admin.firestore.FieldValue.increment(1);
+
     return usersCol
       .doc(uid)
       .update({
@@ -84,14 +89,11 @@ export const incrementUserScore = functions
         updatedAt: admin.firestore.Timestamp.now(),
       })
       .then(() => {
-        res.status(200).json({
-          isOk: true,
-          message: "User's games won incremented.",
-        });
+        sendStatusMsg(200, true, "User's games won incremented.", res);
       })
       .catch((err) => {
         console.log(err);
-        sendErrorMsg(404, "No user found with given uid.", res);
+        sendStatusMsg(404, false, "No user found with given uid.", res);
       });
   });
 
@@ -99,26 +101,26 @@ export const incrementUserScore = functions
 export const getUserData = functions
   .region("asia-southeast2")
   .https.onRequest((req, res) => {
+    
+    //Check if uid passed
     const uid: any = req.query.uid;
     if (!uid) {
-      sendErrorMsg(400, "No uid passed.", res);
+      sendStatusMsg(400, false, "No uid passed.", res);
     }
+
     return usersCol
       .doc(uid)
       .get()
       .then((doc) => {
         if (doc.exists) {
-          res.status(200).json({
-            isOk: true,
-            userData: doc.data(),
-          });
+          sendData(200, "userData", doc.data(), res);
         } else {
-          sendErrorMsg(404, "No user found with given uid.", res);
+          sendStatusMsg(404, false, "No user found with given uid.", res);
         }
       })
       .catch((err) => {
         console.log(err);
-        sendErrorMsg(500, "Fail to get user document.", res);
+        sendStatusMsg(500, false, "Fail to get user document.", res);
       });
   });
 
@@ -126,21 +128,31 @@ export const getUserData = functions
 export const getTopScorers = functions
   .region("asia-southeast2")
   .https.onRequest((req, res) => {
+    
+    //Check if numOfPlayers passed
     let numOfPlayers: any = req.query.numOfPlayers;
-    if (!numOfPlayers) sendErrorMsg(400, "No numOfPlayers passed.", res);
+    if (!numOfPlayers)
+      sendStatusMsg(400, false, "No numOfPlayers passed.", res);
+    if (Number(numOfPlayers) % 1 !== 0)
+      sendStatusMsg(400, false, "numOfPlayers is not integer.", res);
+
+    //Check if timeRange passed and in correct format
     const timeRange: any = req.query.timeRange;
-    if (!timeRange) sendErrorMsg(400, "No timeRange passed.", res);
+    if (!timeRange) sendStatusMsg(400, false, "No timeRange passed.", res);
     if (timeRange !== "day" && timeRange !== "week" && timeRange !== "allTime")
-      sendErrorMsg(
+      sendStatusMsg(
         400,
+        false,
         "timeRange passed is not day / week / month / allTime.",
         res
       );
+
     let orderByField = "totalGamesWon";
     if (timeRange === "day") orderByField = "gamesWonDay";
     else if (timeRange === "week") orderByField = "gamesWonWeek";
     numOfPlayers = Number.parseInt(numOfPlayers);
-    let topPlayers: any = [];
+    const topPlayers: any = [];
+
     return usersCol
       .orderBy(orderByField, "desc")
       .limit(numOfPlayers)
@@ -151,14 +163,11 @@ export const getTopScorers = functions
         });
       })
       .then(() => {
-        res.status(200).json({
-          isOk: true,
-          topPlayers: topPlayers,
-        });
+        sendData(200, "topPlayers", topPlayers, res);
       })
       .catch((err) => {
         console.log(err);
-        sendErrorMsg(500, "Query failed.", res);
+        sendStatusMsg(500, false, "Query failed.", res);
       });
   });
 
@@ -166,10 +175,15 @@ export const getTopScorers = functions
 export const addChatMessage = functions
   .region("asia-southeast2")
   .https.onRequest((req, res) => {
+    
+    //Check if gameId passed
     const gameId: any = req.query.gameId;
-    if (!gameId) sendErrorMsg(400, "No gameId passed.", res);
+    if (!gameId) sendStatusMsg(400, false, "No gameId passed.", res);
+
+    //Check if message passed
     const msg = req.body.message;
-    if (!msg) sendErrorMsg(400, "No message passed.", res);
+    if (!msg) sendStatusMsg(400, false, "No message passed.", res);
+
     const uid = req.body.uid ? req.body.uid : -1;
     const username = req.body.username ? req.body.username : "anonymous";
     const data = {
@@ -178,19 +192,17 @@ export const addChatMessage = functions
       message: msg,
       createdAt: admin.firestore.Timestamp.now(),
     };
+
     return gamesRef
       .child(gameId)
       .push()
       .set(data)
       .then(() => {
-        res.status(200).json({
-          isOk: true,
-          data: data,
-        });
+        sendData(200, "data", data, res);
       })
       .catch((err) => {
         console.log(err);
-        sendErrorMsg(500, "Error while adding message to database.", res);
+        sendStatusMsg(500, false, "Error while adding message.", res);
       });
   });
 
@@ -198,21 +210,20 @@ export const addChatMessage = functions
 export const deleteGameChat = functions
   .region("asia-southeast2")
   .https.onRequest((req, res) => {
+    
+    //Check if gameId passed
     const gameId: any = req.query.gameId;
-    if (!gameId) sendErrorMsg(400, "No gameId passed.", res);
+    if (!gameId) sendStatusMsg(400, false, "No gameId passed.", res);
+    
     return gamesRef
       .child(gameId)
       .remove()
       .then(() => {
-        res.status(200).json({
-          isOk: true,
-          message: "Game chat messages deleted",
-          gameId: gameId,
-        });
+        sendData(200, "gameId", gameId, res, "Game chat messages deleted");
       })
       .catch((err) => {
         console.log(err);
-        sendErrorMsg(404, "No game room found with given gameId.", res);
+        sendStatusMsg(404, false, "No game room found with given gameId.", res);
       });
   });
 
@@ -220,14 +231,19 @@ export const deleteGameChat = functions
 export const resetAllUsersGamesWon = functions
   .region("asia-southeast2")
   .https.onRequest(async (req, res) => {
+    
+    //Check if timeRange passed and in correct format
     const timeRange = req.query.timeRange;
-    if (!timeRange) sendErrorMsg(400, "No timeRange passed.", res);
+    if (!timeRange) sendStatusMsg(400, false, "No timeRange passed.", res);
     if (timeRange !== "day" && timeRange !== "week")
-      sendErrorMsg(400, "timeRange is not day / week.", res);
+      sendStatusMsg(400, false, "timeRange is not day / week.", res);
+    
     const resetData: Record<string, any> = {};
     const resetField = timeRange === "day" ? "gamesWonDay" : "gamesWonWeek";
     resetData[resetField] = 0;
     const batch = admin.firestore().batch();
+    
+    //Add tasks to batch
     await usersCol
       .get()
       .then((snapShot) => {
@@ -237,24 +253,41 @@ export const resetAllUsersGamesWon = functions
       })
       .catch((err) => {
         console.log(err);
-        sendErrorMsg(500, "Error when adding update to batch,", res);
+        sendStatusMsg(500, false, "Error when adding update to batch,", res);
       });
+    
+    //Commit batch
     return batch
       .commit()
       .then(() => {
-        res.status(200).json({
-          isOk: true,
-          message: resetField + " reset for all users.",
-        });
+        sendStatusMsg(200, true, resetField + " reset for all users.", res);
       })
       .catch((err) => {
-        sendErrorMsg(500, "Error while commiting batch", res);
+        console.log(err);
+        sendStatusMsg(500, false, "Error while commiting batch", res);
       });
   });
 
-function sendErrorMsg(errCode: number, msg: string, res: functions.Response) {
-  res.status(errCode).json({
-    isOk: false,
+function sendStatusMsg(
+  statCode: number,
+  isOk: boolean,
+  msg: string,
+  res: functions.Response
+) {
+  res.status(statCode).json({
+    isOk: isOk,
     message: msg,
   });
+}
+
+function sendData(
+  statCode: number,
+  name: string,
+  data: Record<string, any> | undefined,
+  res: functions.Response,
+  msg?: string
+) {
+  const dataSend: Record<string, any> = { isOk: true, message: msg };
+  dataSend[name] = data;
+  res.status(statCode).json(dataSend);
 }
