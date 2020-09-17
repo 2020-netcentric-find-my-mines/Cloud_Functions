@@ -1,9 +1,9 @@
-name: Reset_Games_Won_by_Day
+name: Reset Games Won by Day
 on: 
   schedule:
-     - cron: '2 * * * *'
+     - cron: '0 0 * * *'
 jobs:
-  reset_games:
+  reset_games_day:
     runs-on: ubuntu-latest
     steps:
       - run: curl https://asia-southeast2-findmymines.cloudfunctions.net/resetAllUsersGamesWon?timeRange=day
