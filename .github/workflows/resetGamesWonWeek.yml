@@ -1,0 +1,9 @@
+name: Reset Games Won by Week
+on: 
+  schedule:
+     - cron: '0 0 * * 1'
+jobs:
+  reset_games_week:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl https://asia-southeast2-findmymines.cloudfunctions.net/resetAllUsersGamesWon?timeRange=week
