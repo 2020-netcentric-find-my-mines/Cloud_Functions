@@ -2,6 +2,7 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 
 admin.initializeApp();
+const users_col = admin.firestore().collection("Users");
 
 // // Start writing Firebase Functions
 // // https://firebase.google.com/docs/functions/typescript
@@ -19,9 +20,9 @@ export const addUserDoc = functions
     const uid = user.uid;
     const data = {
       email: email,
-      username: "",
-      firstname: "",
-      lastname: "",
+      username: "undefined",
+      firstname: "undefined",
+      lastname: "undefined",
       gamesWon: 0,
       createdAt: admin.firestore.Timestamp.now(),
     };
@@ -60,6 +61,41 @@ export const changeUserData = functions
       .update(updateData)
       .catch((err) => {
         console.log("Error creating user", err);
+      });
+  });
+
+export const getUserData = functions
+  .region("asia-southeast2")
+  .https.onRequest((req, res) => {
+    const uid: any = req.query.uid;
+    if (!uid) {
+      res.status(400).json({
+        isOk: false,
+        message: "No uid passed.",
+      });
+    }
+    return users_col
+      .doc(uid)
+      .get()
+      .then((doc) => {
+        if (doc.exists) {
+          res.status(200).json({
+            isOk: true,
+            userData: doc.data(),
+          });
+        } else {
+          res.status(404).json({
+            isOk: false,
+            message: "No user found with given uid.",
+          });
+        }
+      })
+      .catch((err) => {
+        console.log(err);
+        res.json({
+          isOk: false,
+          message: "Fail to get user document.",
+        });
       });
   });
 
