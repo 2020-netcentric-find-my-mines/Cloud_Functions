@@ -99,6 +99,42 @@ export const getUserData = functions
       });
   });
 
+export const getTopScorers = functions
+  .region("asia-southeast2")
+  .https.onRequest((req, res) => {
+    let numOfPlayers: any = req.query.numOfPlayers;
+    if (!numOfPlayers) {
+      res.status(400).json({
+        isOk: false,
+        message: "No numOfPlayers passed.",
+      });
+    }
+    numOfPlayers = Number.parseInt(numOfPlayers);
+    let topPlayers: any = [];
+    return users_col
+      .orderBy("gamesWon", "desc")
+      .limit(numOfPlayers)
+      .get()
+      .then((querySnapshot) => {
+        querySnapshot.forEach((doc) => {
+          topPlayers.push(doc.data());
+        });
+      })
+      .then(() => {
+        res.status(200).json({
+          isOk: true,
+          topPlayers: topPlayers,
+        });
+      })
+      .catch((err) => {
+        console.log(err);
+        res.status(404).json({
+          isOk: false,
+          message: "Query faield.",
+        });
+      });
+  });
+
 // export const addMessage = functions.region('asia-southeast2').https.onRequest((req, res) => {
 //   const name = req.body.name;
 //   const message = req.body.message;
