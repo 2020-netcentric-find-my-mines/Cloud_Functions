@@ -7,8 +7,7 @@ const usersCol = admin.firestore().collection("Users");
 const gamesRef = admin.database().ref("games");
 
 // // Start writing Firebase Functions
-// // https://firebase.google.com/docs/functions/typescript
-//
+
 export const helloWorld = functions.https.onRequest((request, response) => {
   functions.logger.info("Hello logs!", { structuredData: true });
   response.send("Hello from Firebase!");
@@ -259,14 +258,3 @@ function sendErrorMsg(errCode: number, msg: string, res: functions.Response) {
     message: msg,
   });
 }
-
-// export const addMessage = functions.region('asia-southeast2').https.onRequest((req, res) => {
-//   const name = req.body.name;
-//   const message = req.body.message;
-//   console.log(name, message);
-//   res.status(200).json({
-//     isOK: true,
-//     name: name,
-//     message: message,
-//   });
-// })
