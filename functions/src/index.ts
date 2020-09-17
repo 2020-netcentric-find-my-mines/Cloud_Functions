@@ -145,6 +145,40 @@ export const getTopScorers = functions
       });
   });
 
+export const addChatMessage = functions
+  .region("asia-southeast2")
+  .https.onRequest((req, res) => {
+    const gameId: any = req.query.gameId;
+    if (!gameId) sendErrorMsg(400, "No gameId passed.", res);
+    const msg = req.body.message;
+    if (!msg) sendErrorMsg(400, "No message passed.", res);
+    const uid = req.body.uid ? req.body.uid : -1;
+    const username = req.body.username ? req.body.username : "anonymous";
+    const data = {
+      uid: uid,
+      username: username,
+      message: msg,
+      createdAt: admin.firestore.Timestamp.now(),
+    };
+    return admin
+      .database()
+      .ref()
+      .child("games")
+      .child(gameId)
+      .push()
+      .set(data)
+      .then(() => {
+        res.status(200).json({
+          isOk: true,
+          data: data,
+        });
+      })
+      .catch((err) => {
+        console.log(err);
+        sendErrorMsg(500, "Error while adding message to database.", res);
+      });
+  });
+
 function sendErrorMsg(errCode: number, msg: string, res: functions.Response) {
   res.status(errCode).json({
     isOk: false,
