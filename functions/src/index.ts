@@ -4,6 +4,7 @@ import * as admin from "firebase-admin";
 admin.initializeApp();
 
 const usersCol = admin.firestore().collection("Users");
+const gamesRef = admin.database().ref("games");
 
 // // Start writing Firebase Functions
 // // https://firebase.google.com/docs/functions/typescript
@@ -162,10 +163,7 @@ export const addChatMessage = functions
       message: msg,
       createdAt: admin.firestore.Timestamp.now(),
     };
-    return admin
-      .database()
-      .ref()
-      .child("games")
+    return gamesRef
       .child(gameId)
       .push()
       .set(data)
@@ -187,9 +185,8 @@ export const deleteGameChat = functions
   .https.onRequest((req, res) => {
     const gameId: any = req.query.gameId;
     if (!gameId) sendErrorMsg(400, "No gameId passed.", res);
-    return admin
-      .database()
-      .ref("games/" + gameId)
+    return gamesRef
+      .child(gameId)
       .remove()
       .then(() => {
         res.status(200).json({
