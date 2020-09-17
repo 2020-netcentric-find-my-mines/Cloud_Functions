@@ -2,7 +2,8 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 
 admin.initializeApp();
-const users_col = admin.firestore().collection("Users");
+
+const usersCol = admin.firestore().collection("Users");
 
 // // Start writing Firebase Functions
 // // https://firebase.google.com/docs/functions/typescript
@@ -26,9 +27,7 @@ export const addUserDoc = functions
       gamesWon: 0,
       createdAt: admin.firestore.Timestamp.now(),
     };
-    return admin
-      .firestore()
-      .collection("Users")
+    return usersCol
       .doc(uid)
       .set(data)
       .catch((err) => {
@@ -36,6 +35,7 @@ export const addUserDoc = functions
       });
   });
 
+//Required user to authenticate and data as object: username / firstname / lastname
 export const changeUserData = functions
   .region("asia-southeast2")
   .https.onCall((data, context) => {
@@ -53,28 +53,49 @@ export const changeUserData = functions
     if (data.username) updateData.username = data.username;
     if (data.firstname) updateData.firstname = data.firstname;
     if (data.lastname) updateData.lastname = data.lastname;
-    if (data.gamesWon) updateData.gamesWon = Number(data.gamesWon);
-    return admin
-      .firestore()
-      .collection("Users")
+    return usersCol
       .doc(uid)
       .update(updateData)
       .catch((err) => {
         console.log("Error creating user", err);
+        throw new functions.https.HttpsError(
+          "internal",
+          "An error occurred while trying to update user data."
+        );
       });
   });
 
+//Increment user's gamesWon by specifying uid as query
+export const incrementUserScore = functions
+  .region("asia-southeast2")
+  .https.onRequest((req, res) => {
+    const uid: any = req.query.uid;
+    if (!uid) sendErrorMsg(400, "No uid passed", res);
+    const increment = admin.firestore.FieldValue.increment(1);
+    return usersCol
+      .doc(uid)
+      .update({ gamesWon: increment })
+      .then(() => {
+        res.status(200).json({
+          isOk: true,
+          message: "User's gamesWon incremented.",
+        });
+      })
+      .catch((err) => {
+        console.log(err);
+        sendErrorMsg(404, "No user found with given uid.", res);
+      });
+  });
+
+//Required uid as query
 export const getUserData = functions
   .region("asia-southeast2")
   .https.onRequest((req, res) => {
     const uid: any = req.query.uid;
     if (!uid) {
-      res.status(400).json({
-        isOk: false,
-        message: "No uid passed.",
-      });
+      sendErrorMsg(400, "No uid passed.", res);
     }
-    return users_col
+    return usersCol
       .doc(uid)
       .get()
       .then((doc) => {
@@ -84,34 +105,26 @@ export const getUserData = functions
             userData: doc.data(),
           });
         } else {
-          res.status(404).json({
-            isOk: false,
-            message: "No user found with given uid.",
-          });
+          sendErrorMsg(404, "No user found with given uid.", res);
         }
       })
       .catch((err) => {
         console.log(err);
-        res.json({
-          isOk: false,
-          message: "Fail to get user document.",
-        });
+        sendErrorMsg(500, "Fail to get user document.", res);
       });
   });
 
+//Require numOfPlayers as query
 export const getTopScorers = functions
   .region("asia-southeast2")
   .https.onRequest((req, res) => {
     let numOfPlayers: any = req.query.numOfPlayers;
     if (!numOfPlayers) {
-      res.status(400).json({
-        isOk: false,
-        message: "No numOfPlayers passed.",
-      });
+      sendErrorMsg(400, "No numOfPlayers passed.", res);
     }
     numOfPlayers = Number.parseInt(numOfPlayers);
     let topPlayers: any = [];
-    return users_col
+    return usersCol
       .orderBy("gamesWon", "desc")
       .limit(numOfPlayers)
       .get()
@@ -128,12 +141,16 @@ export const getTopScorers = functions
       })
       .catch((err) => {
         console.log(err);
-        res.status(404).json({
-          isOk: false,
-          message: "Query faield.",
-        });
+        sendErrorMsg(500, "Query failed.", res);
       });
   });
+
+function sendErrorMsg(errCode: number, msg: string, res: functions.Response) {
+  res.status(errCode).json({
+    isOk: false,
+    message: msg,
+  });
+}
 
 // export const addMessage = functions.region('asia-southeast2').https.onRequest((req, res) => {
 //   const name = req.body.name;
