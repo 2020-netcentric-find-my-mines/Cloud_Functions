@@ -217,6 +217,42 @@ export const deleteGameChat = functions
       });
   });
 
+//Require timeRange (day / week) as query
+export const resetAllUsersGamesWon = functions
+  .region("asia-southeast2")
+  .https.onRequest(async (req, res) => {
+    const timeRange = req.query.timeRange;
+    if (!timeRange) sendErrorMsg(400, "No timeRange passed.", res);
+    if (timeRange !== "day" && timeRange !== "week")
+      sendErrorMsg(400, "timeRange is not day / week.", res);
+    const resetData: Record<string, any> = {};
+    const resetField = timeRange === "day" ? "gamesWonDay" : "gamesWonWeek";
+    resetData[resetField] = 0;
+    const batch = admin.firestore().batch();
+    await usersCol
+      .get()
+      .then((snapShot) => {
+        snapShot.forEach((doc) => {
+          batch.update(doc.ref, resetData);
+        });
+      })
+      .catch((err) => {
+        console.log(err);
+        sendErrorMsg(500, "Error when adding update to batch,", res);
+      });
+    return batch
+      .commit()
+      .then(() => {
+        res.status(200).json({
+          isOk: true,
+          message: resetField + " reset for all users.",
+        });
+      })
+      .catch((err) => {
+        sendErrorMsg(500, "Error while commiting batch", res);
+      });
+  });
+
 function sendErrorMsg(errCode: number, msg: string, res: functions.Response) {
   res.status(errCode).json({
     isOk: false,
