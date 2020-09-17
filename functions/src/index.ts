@@ -26,7 +26,9 @@ export const addUserDoc = functions
       username: "undefined",
       firstname: "undefined",
       lastname: "undefined",
-      gamesWon: 0,
+      totalGamesWon: 0,
+      gamesWonDay: 0,
+      gamesWonWeek: 0,
       createdAt: admin.firestore.Timestamp.now(),
     };
     return usersCol
@@ -67,7 +69,7 @@ export const changeUserData = functions
       });
   });
 
-//Increment user's gamesWon by specifying uid as query
+//Increment user's games won by specifying uid as query
 export const incrementUserScore = functions
   .region("asia-southeast2")
   .https.onRequest((req, res) => {
@@ -76,11 +78,16 @@ export const incrementUserScore = functions
     const increment = admin.firestore.FieldValue.increment(1);
     return usersCol
       .doc(uid)
-      .update({ gamesWon: increment })
+      .update({
+        totalGamesWon: increment,
+        gamesWonDay: increment,
+        gamesWonWeek: increment,
+        updatedAt: admin.firestore.Timestamp.now(),
+      })
       .then(() => {
         res.status(200).json({
           isOk: true,
-          message: "User's gamesWon incremented.",
+          message: "User's games won incremented.",
         });
       })
       .catch((err) => {
@@ -116,18 +123,27 @@ export const getUserData = functions
       });
   });
 
-//Required numOfPlayers as query
+//Required numOfPlayers and timeRange (day / week / allTime) as query
 export const getTopScorers = functions
   .region("asia-southeast2")
   .https.onRequest((req, res) => {
     let numOfPlayers: any = req.query.numOfPlayers;
-    if (!numOfPlayers) {
-      sendErrorMsg(400, "No numOfPlayers passed.", res);
-    }
+    if (!numOfPlayers) sendErrorMsg(400, "No numOfPlayers passed.", res);
+    const timeRange: any = req.query.timeRange;
+    if (!timeRange) sendErrorMsg(400, "No timeRange passed.", res);
+    if (timeRange !== "day" && timeRange !== "week" && timeRange !== "allTime")
+      sendErrorMsg(
+        400,
+        "timeRange passed is not day / week / month / allTime.",
+        res
+      );
+    let orderByField = "totalGamesWon";
+    if (timeRange === "day") orderByField = "gamesWonDay";
+    else if (timeRange === "week") orderByField = "gamesWonWeek";
     numOfPlayers = Number.parseInt(numOfPlayers);
     let topPlayers: any = [];
     return usersCol
-      .orderBy("gamesWon", "desc")
+      .orderBy(orderByField, "desc")
       .limit(numOfPlayers)
       .get()
       .then((querySnapshot) => {
