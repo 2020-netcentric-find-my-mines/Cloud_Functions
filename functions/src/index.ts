@@ -34,11 +34,30 @@ export const addUserDoc = functions
       });
   });
 
+//Required uid as query
+export const deleteUserDoc = functions
+  .region("asia-southeast2")
+  .https.onRequest((req, res) => {
+    //Check if uid passed
+    const uid: any = req.query.uid;
+    if (!uid) sendStatusMsg(400, false, "No uid passed.", res);
+
+    return usersCol
+      .doc(uid)
+      .delete()
+      .then(() => {
+        sendData(200, "uid", uid, res);
+      })
+      .catch((err) => {
+        console.log(err);
+        sendStatusMsg(404, false, "No user doc found with given uid.", res);
+      });
+  });
+
 //Required user to authenticate and data as object: username / firstname / lastname
 export const changeUserData = functions
   .region("asia-southeast2")
   .https.onCall(async (data, context) => {
-    
     //Check if auth exists
     const auth = context.auth;
     if (!auth) {
@@ -73,7 +92,6 @@ export const changeUserData = functions
 export const incrementUserScore = functions
   .region("asia-southeast2")
   .https.onRequest((req, res) => {
-    
     //Check if uid passed
     const uid: any = req.query.uid;
     if (!uid) sendStatusMsg(400, false, "No uid passed", res);
@@ -101,7 +119,6 @@ export const incrementUserScore = functions
 export const getUserData = functions
   .region("asia-southeast2")
   .https.onRequest((req, res) => {
-    
     //Check if uid passed
     const uid: any = req.query.uid;
     if (!uid) {
@@ -128,7 +145,6 @@ export const getUserData = functions
 export const getTopScorers = functions
   .region("asia-southeast2")
   .https.onRequest((req, res) => {
-    
     //Check if numOfPlayers passed
     let numOfPlayers: any = req.query.numOfPlayers;
     if (!numOfPlayers)
@@ -175,7 +191,6 @@ export const getTopScorers = functions
 export const addChatMessage = functions
   .region("asia-southeast2")
   .https.onRequest((req, res) => {
-    
     //Check if gameId passed
     const gameId: any = req.query.gameId;
     if (!gameId) sendStatusMsg(400, false, "No gameId passed.", res);
@@ -210,11 +225,10 @@ export const addChatMessage = functions
 export const deleteGameChat = functions
   .region("asia-southeast2")
   .https.onRequest((req, res) => {
-    
     //Check if gameId passed
     const gameId: any = req.query.gameId;
     if (!gameId) sendStatusMsg(400, false, "No gameId passed.", res);
-    
+
     return gamesRef
       .child(gameId)
       .remove()
@@ -231,18 +245,17 @@ export const deleteGameChat = functions
 export const resetAllUsersGamesWon = functions
   .region("asia-southeast2")
   .https.onRequest(async (req, res) => {
-    
     //Check if timeRange passed and in correct format
     const timeRange = req.query.timeRange;
     if (!timeRange) sendStatusMsg(400, false, "No timeRange passed.", res);
     if (timeRange !== "day" && timeRange !== "week")
       sendStatusMsg(400, false, "timeRange is not day / week.", res);
-    
+
     const resetData: Record<string, any> = {};
     const resetField = timeRange === "day" ? "gamesWonDay" : "gamesWonWeek";
     resetData[resetField] = 0;
     const batch = admin.firestore().batch();
-    
+
     //Add tasks to batch
     await usersCol
       .get()
@@ -255,7 +268,7 @@ export const resetAllUsersGamesWon = functions
         console.log(err);
         sendStatusMsg(500, false, "Error when adding update to batch,", res);
       });
-    
+
     //Commit batch
     return batch
       .commit()
